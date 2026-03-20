@@ -13,17 +13,16 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install dependencies
+      - name: Install LabelU and dependencies
         run: |
-          pip install pytest pytest-playwright pyyaml
+          pip install labelu pytest pytest-playwright pyyaml
           playwright install chromium
 
-      # 👇 关键：使用 cmd shell
+      # 关键：使用 cmd shell
       - name: Start LabelU
         shell: cmd
         run: |
           start-labelu.bat
-          timeout /t 15 /nobreak >nul
 
       - name: Run UI Tests
         run: |
