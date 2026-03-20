@@ -1,0 +1,43 @@
+name: LabelU UI Regression
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  ui-test:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Python dependencies
+        run: |
+          pip install pytest pytest-playwright pyyaml
+          playwright install chromium
+
+      - name: Start LabelU
+        run: |
+          cd .
+          # 执行你写的 bat 文件
+          start-labelu.bat
+          timeout /t 15 /nobreak >nul
+          echo "LabelU started on http://localhost:8000"
+
+      - name: Run UI Tests
+        run: |
+          pytest tests/ --browser chromium --tracing on --video on
+
+      - name: Upload artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test results/

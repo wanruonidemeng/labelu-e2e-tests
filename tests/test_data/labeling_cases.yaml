@@ -1,0 +1,18 @@
+# tests/test_data/labeling_cases.yaml
+- task_name: "猫图像标注"
+  image: "cat.png"
+  points:
+    - [79, 61]
+    - [442, 144]
+    - [419, 317]
+    - [197, 399]
+    - [95, 226]
+
+- task_name: "狗图像标注"
+  image: "dog.png"
+  points:
+    - [200, 220]
+    - [400, 400]
+    - [250, 750]
+    - [180, 500]
+    - [90, 650]
