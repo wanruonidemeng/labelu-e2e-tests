@@ -11,24 +11,19 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'  # 和教程一致
 
-      - name: Install LabelU and dependencies
+      - name: Install dependencies
         run: |
-          pip install labelu pytest pytest-playwright pyyaml
+          python -m pip install --upgrade pip
+          pip install labelu pytest pytest-playwright pyyaml requests
           playwright install chromium
-
-      # 关键：使用 cmd shell
-      - name: Start LabelU
-        shell: cmd
-        run: |
-          start-labelu.bat
 
       - name: Run UI Tests
         run: |
           pytest tests/ --browser chromium --tracing on --video on
 
-      - name: Upload artifacts on failure
+      - name: Upload test results on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
