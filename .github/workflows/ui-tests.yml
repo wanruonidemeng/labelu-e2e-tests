@@ -1,31 +1,90 @@
-name: LabelU UI Regression
+name: LabelU UI Tests (Conda)
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   ui-test:
     runs-on: windows-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      # ==================================================
+      # Step 1: 安装 Miniconda 并初始化环境
+      # ==================================================
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v3
         with:
-          python-version: '3.11'  # 和教程一致
+          miniconda-version: "latest"
+          python-version: "3.11"
+          activate-environment: labelu-env
+          auto-activate-base: false
+          add-pip-as-python-module: true
 
-      - name: Install dependencies
+      # ==================================================
+      # Step 2: 创建并激活 Conda 环境（等价于本地 conda create）
+      # ==================================================
+      - name: Create and activate Conda environment
+        shell: bash -l {0}
         run: |
+          conda create -n labelu-env python=3.11 -y
+          conda activate labelu-env
           python -m pip install --upgrade pip
+
+      # ==================================================
+      # Step 3: 安装 LabelU 和测试依赖
+      # ==================================================
+      - name: Install dependencies
+        shell: bash -l {0}
+        run: |
+          conda activate labelu-env
           pip install labelu pytest pytest-playwright pyyaml requests
           playwright install chromium
 
-      - name: Run UI Tests
+      # ==================================================
+      # Step 4: 启动 LabelU 服务 + 运行 UI 测试
+      # ==================================================
+      - name: Start LabelU and run tests
+        shell: bash -l {0}
         run: |
-          pytest tests/ --browser chromium --tracing on --video on
+          conda activate labelu-env
 
+          # 启动 LabelU 服务（Windows 后台运行）
+          start /B labelu start --port 8000 > nul 2>&1
+
+          # 等待服务就绪（最多 60 秒）
+          python -c "
+import time
+import requests
+print('Waiting for LabelU to start...')
+for i in range(60):
+    try:
+        resp = requests.get('http://localhost:8000/docs', timeout=1)
+        if resp.status_code == 200 and 'Swagger' in resp.text:
+            print('✅ LabelU is ready!')
+            exit(0)
+    except Exception as e:
+        pass
+    time.sleep(1)
+    print(f'⏳ Waiting... ({i+1}/60)')
+print('❌ LabelU failed to start')
+exit(1)
+"
+
+          # 运行 Playwright UI 测试
+          pytest tests/ --browser chromium --tracing on --video on -v
+
+      # ==================================================
+      # Step 5: 失败时上传测试产物（视频、trace）
+      # ==================================================
       - name: Upload test results on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: playwright-test-results
           path: test-results/
