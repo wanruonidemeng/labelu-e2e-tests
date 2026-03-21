@@ -1,15 +1,13 @@
-name: LabelU UI Tests (Conda)
+name: LabelU UI Tests
 
 on: [push, pull_request]
 
 jobs:
   test:
     runs-on: windows-latest
-
     steps:
       - uses: actions/checkout@v4
 
-      # 安装 Miniconda（官方 Action）
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v3
         with:
@@ -17,7 +15,6 @@ jobs:
           python-version: "3.11"
           auto-activate-base: false
 
-      # 创建环境并安装依赖（关键：用 bash -l 模拟 Anaconda Prompt）
       - name: Install dependencies
         shell: bash -l {0}
         run: |
@@ -26,20 +23,18 @@ jobs:
           pip install labelu pytest pytest-playwright requests
           playwright install chromium
 
-      # 启动服务 + 运行测试
-      - name: Run UI tests
+      - name: Start LabelU and run tests
         shell: bash -l {0}
         run: |
           conda activate labelu-env
-          # 后台启动 LabelU（Linux/macOS 用 nohup &，Windows 在 bash 中也兼容）
+          # 启动服务（后台）
           nohup labelu start --port 8000 > labelu.log 2>&1 &
-          # 等待服务就绪
+          # 等待就绪
           for i in {1..60}; do
-            if curl -s http://localhost:8000/docs | grep -q "Swagger"; then
-              echo "✅ LabelU is ready!"
-              break
+            if curl -s http://localhost:8000/docs | grep -q Swagger; then
+              echo "✅ Ready"; break
             fi
             sleep 1
           done
-          # 运行测试
+          # 运行测试（此时 LabelU 已由 CI 启动）
           pytest tests/ --browser chromium --tracing on --video on -v
