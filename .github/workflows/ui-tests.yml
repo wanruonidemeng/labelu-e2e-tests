@@ -1,81 +1,45 @@
 name: LabelU UI Tests (Conda)
 
-on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main ]
+on: [push, pull_request]
 
 jobs:
-  ui-test:
+  test:
     runs-on: windows-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
+      # 安装 Miniconda（官方 Action）
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v3
         with:
           miniconda-version: "latest"
           python-version: "3.11"
-          activate-environment: labelu-env
           auto-activate-base: false
-          add-pip-as-python-module: true
 
-      - name: Create and activate Conda environment
+      # 创建环境并安装依赖（关键：用 bash -l 模拟 Anaconda Prompt）
+      - name: Install dependencies
         shell: bash -l {0}
         run: |
           conda create -n labelu-env python=3.11 -y
           conda activate labelu-env
-          python -m pip install --upgrade pip
-
-      - name: Install dependencies
-        shell: bash -l {0}
-        run: |
-          conda activate labelu-env
-          pip install labelu pytest pytest-playwright pyyaml requests
+          pip install labelu pytest pytest-playwright requests
           playwright install chromium
 
-      - name: Start LabelU and run tests
+      # 启动服务 + 运行测试
+      - name: Run UI tests
         shell: bash -l {0}
         run: |
           conda activate labelu-env
-
-          # 启动 LabelU 服务（后台）
-          start /B labelu start --port 8000 > nul 2>&1
-
-          # === 写入等待脚本到临时文件 ===
-          cat > wait_labelu.py << 'EOF'
-import time
-import requests
-import sys
-
-print("Waiting for LabelU to start...")
-for i in range(60):
-    try:
-        resp = requests.get("http://localhost:8000/docs", timeout=1)
-        if resp.status_code == 200 and "Swagger" in resp.text:
-            print("✅ LabelU is ready!")
-            sys.exit(0)
-    except Exception:
-        pass
-    time.sleep(1)
-    print(f"⏳ Waiting... ({i+1}/60)")
-
-print("❌ LabelU failed to start")
-sys.exit(1)
-EOF
-
-          # 执行等待脚本
-          python wait_labelu.py
-
+          # 后台启动 LabelU（Linux/macOS 用 nohup &，Windows 在 bash 中也兼容）
+          nohup labelu start --port 8000 > labelu.log 2>&1 &
+          # 等待服务就绪
+          for i in {1..60}; do
+            if curl -s http://localhost:8000/docs | grep -q "Swagger"; then
+              echo "✅ LabelU is ready!"
+              break
+            fi
+            sleep 1
+          done
           # 运行测试
           pytest tests/ --browser chromium --tracing on --video on -v
-
-      - name: Upload test results on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-test-results
-          path: test-results/
