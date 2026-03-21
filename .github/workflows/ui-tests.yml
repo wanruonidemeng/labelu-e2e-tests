@@ -14,9 +14,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ==================================================
-      # Step 1: 安装 Miniconda 并初始化环境
-      # ==================================================
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v3
         with:
@@ -26,9 +23,6 @@ jobs:
           auto-activate-base: false
           add-pip-as-python-module: true
 
-      # ==================================================
-      # Step 2: 创建并激活 Conda 环境（等价于本地 conda create）
-      # ==================================================
       - name: Create and activate Conda environment
         shell: bash -l {0}
         run: |
@@ -36,9 +30,6 @@ jobs:
           conda activate labelu-env
           python -m pip install --upgrade pip
 
-      # ==================================================
-      # Step 3: 安装 LabelU 和测试依赖
-      # ==================================================
       - name: Install dependencies
         shell: bash -l {0}
         run: |
@@ -46,42 +37,35 @@ jobs:
           pip install labelu pytest pytest-playwright pyyaml requests
           playwright install chromium
 
-      # ==================================================
-      # Step 4: 启动 LabelU 服务 + 运行 UI 测试
-      # ==================================================
       - name: Start LabelU and run tests
         shell: bash -l {0}
         run: |
           conda activate labelu-env
 
-          # 启动 LabelU 服务（Windows 后台运行）
+          # 启动 LabelU 服务（后台）
           start /B labelu start --port 8000 > nul 2>&1
 
-          # 等待服务就绪（最多 60 秒）
+          # 等待服务就绪（使用单行 Python 脚本）
           python -c "
-import time
-import requests
-print('Waiting for LabelU to start...')
+import time, requests, sys;
+print('Waiting for LabelU to start...');
 for i in range(60):
     try:
-        resp = requests.get('http://localhost:8000/docs', timeout=1)
-        if resp.status_code == 200 and 'Swagger' in resp.text:
-            print('✅ LabelU is ready!')
-            exit(0)
-    except Exception as e:
+        r = requests.get('http://localhost:8000/docs', timeout=1);
+        if r.status_code == 200 and 'Swagger' in r.text:
+            print('✅ LabelU is ready!');
+            sys.exit(0)
+    except:
         pass
     time.sleep(1)
     print(f'⏳ Waiting... ({i+1}/60)')
-print('❌ LabelU failed to start')
-exit(1)
+print('❌ LabelU failed to start');
+sys.exit(1)
 "
 
-          # 运行 Playwright UI 测试
+          # 运行测试
           pytest tests/ --browser chromium --tracing on --video on -v
 
-      # ==================================================
-      # Step 5: 失败时上传测试产物（视频、trace）
-      # ==================================================
       - name: Upload test results on failure
         if: failure()
         uses: actions/upload-artifact@v4
