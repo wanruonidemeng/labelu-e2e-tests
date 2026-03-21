@@ -20,7 +20,7 @@ jobs:
         run: |
           conda create -n labelu-env python=3.11 -y
           conda activate labelu-env
-          pip install labelu pytest pytest-playwright requests
+          pip install labelu pytest pytest-playwright requests pyyaml
           playwright install chromium
 
       - name: Start LabelU and run tests
