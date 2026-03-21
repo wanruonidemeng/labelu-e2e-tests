@@ -45,23 +45,30 @@ jobs:
           # 启动 LabelU 服务（后台）
           start /B labelu start --port 8000 > nul 2>&1
 
-          # 等待服务就绪（使用单行 Python 脚本）
-          python -c "
-import time, requests, sys;
-print('Waiting for LabelU to start...');
+          # === 写入等待脚本到临时文件 ===
+          cat > wait_labelu.py << 'EOF'
+import time
+import requests
+import sys
+
+print("Waiting for LabelU to start...")
 for i in range(60):
     try:
-        r = requests.get('http://localhost:8000/docs', timeout=1);
-        if r.status_code == 200 and 'Swagger' in r.text:
-            print('✅ LabelU is ready!');
+        resp = requests.get("http://localhost:8000/docs", timeout=1)
+        if resp.status_code == 200 and "Swagger" in resp.text:
+            print("✅ LabelU is ready!")
             sys.exit(0)
-    except:
+    except Exception:
         pass
     time.sleep(1)
-    print(f'⏳ Waiting... ({i+1}/60)')
-print('❌ LabelU failed to start');
+    print(f"⏳ Waiting... ({i+1}/60)")
+
+print("❌ LabelU failed to start")
 sys.exit(1)
-"
+EOF
+
+          # 执行等待脚本
+          python wait_labelu.py
 
           # 运行测试
           pytest tests/ --browser chromium --tracing on --video on -v
